@@ -1,0 +1,10 @@
+base
+ggplot2
+lattice
+caret
+dplyr
+rpart
+rpart.plot
+tibble
+bitops
+rattle
