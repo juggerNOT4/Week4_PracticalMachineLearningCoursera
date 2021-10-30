@@ -1,0 +1,138 @@
+---
+title: "Practical machine learning week 4 assignment"
+author: "Abhisht"
+date: "29/10/2021"
+output: html_document
+---
+
+Overview: The goal of this project is to predict the manner in which the subjects did the exercise (classe). From the website (http://web.archive.org/web/20161224072740/http:/groupware.les.inf.puc-rio.br/har) :
+
+_Class A corresponds to the specified execution of the exercise, while the other 4 classes correspond to common mistakes._
+
+
+
+```{r setup, include=FALSE}
+library(caret)
+library(dplyr)
+library(rpart)
+library(rpart.plot)
+library(rattle)
+```
+Download the data sets from:
+
+Training - https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv 
+
+Testing - https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv
+
+```{r}
+ HAR_trainingdata <- read.csv("pml-training.csv")
+ HAR_testingdata <- read.csv("pml-testing.csv")
+ dim(HAR_trainingdata)
+ dim(HAR_testingdata)
+ 
+```
+
+Remove columns/variables having nearly zero variance
+
+The subjects were asked to weightlift the 1.5kg dumbbells. 
+
+_Six young health participants were asked to perform one set of 10 repetitions of the Unilateral Dumbbell Biceps Curl in five different fashions: exactly according to the specification (Class A), throwing the elbows to the front (Class B), lifting the dumbbell only halfway (Class C), lowering the dumbbell only halfway (Class D) and throwing the hips to the front (Class E)._
+
+Remove the unnecessary columns and store the remaining.
+
+We see that a lot of empty data and NAs are in the data set. Need to remove that.
+
+```{r}
+
+#identify NAs and remove them using sapply
+no_NAs <- sapply(HAR_trainingdata, function(x) mean(is.na(x)))>0.95
+HAR_trainingdata2 <- HAR_trainingdata[, no_NAs==FALSE]
+HAR_testingdata2 <- HAR_testingdata[, no_NAs==FALSE]
+
+
+#remove almost empty columns (with almost zero variance)
+temp <- nearZeroVar(HAR_trainingdata2)
+HAR_trainingdata2 <- HAR_trainingdata2[, -temp]
+HAR_testingdata2 <- HAR_testingdata2[, -temp]
+
+dim(HAR_trainingdata2)
+
+dim(HAR_testingdata2)
+
+```
+
+
+Now remove the unnecessary columns (first 6, which are not required)
+
+```{r}
+HAR_trainingdata3 <- HAR_trainingdata2[, 7:59]
+HAR_testingdata3 <- HAR_testingdata2[, 7:59]
+
+names(HAR_trainingdata3)
+names(HAR_testingdata3)
+
+```
+
+This is our final data set on which we can fit models. Let's do that.
+
+```{r}
+
+#creating data partition
+set.seed(1234)
+inTrain <- createDataPartition(y=HAR_trainingdata3$classe, p=0.7, list=FALSE)
+training <- HAR_trainingdata3[inTrain,]
+testing <- HAR_trainingdata3[-inTrain,]
+```
+
+Now let's build a model and predict.
+
+```{r, cache=TRUE, fig.align='center', fig.height=4,fig.width=5}
+set.seed(4444)
+#using rpart
+fit_rpart <- train(classe~. , method = "rpart", data = training)
+
+predictionrpart <- predict(fit_rpart, testing)
+
+fit_rpart
+
+fancyRpartPlot(fit_rpart$finalModel)
+
+confusionMatrix.train(fit_rpart)
+
+
+
+
+```
+
+Using the _allowParallel_ method as it takes very less time. Normally fitting the model takes ages.
+
+```{r, cache=TRUE}
+#Random forest
+set.seed(4444)
+
+fitControl <- trainControl(method = "cv",
+                            number = 5,
+                           allowParallel = TRUE)
+
+fit_rf <- train(classe~. , method = "rf", data = training, trControl= fitControl)
+predict_rf <- predict(fit_rf, testing)
+
+confusionMatrix.train(fit_rf)
+```
+
+
+*Conclusion*
+
+We see that the RF model fits very well with ~99% accuracy, which is just what we need.
+
+Let's predict the HAR testing data with this model.
+```{r}
+
+predict(fit_rf, HAR_testingdata3)
+
+```
+
+
+
+
+
